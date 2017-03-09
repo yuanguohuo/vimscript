@@ -1,0 +1,447 @@
+" An example for a vimrc file.
+"
+" Maintainer:	Bram Moolenaar <Bram@vim.org>
+" Last change:	2006 Aug 12
+"
+" To use it, copy it to
+"     for Unix and OS/2:  ~/.vimrc
+"	      for Amiga:  s:.vimrc
+"  for MS-DOS and Win32:  $VIM\_vimrc
+"	    for OpenVMS:  sys$login:.vimrc
+
+" When started as "evim", evim.vim will already have done these settings.
+if v:progname =~? "evim"
+  finish
+endif
+
+
+" Use Vim settings, rather then Vi settings (much better!).
+" This must be first, because it changes other options as a side effect.
+set nocompatible
+
+" allow backspacing over everything in insert mode
+set backspace=indent,eol,start
+
+if has("vms")
+  set nobackup		" do not keep a backup file, use versions instead
+else
+  set nobackup		"keep a backup file
+endif
+set history=50		" keep 50 lines of command line history
+set ruler		" show the cursor position all the time
+set showcmd		" display incomplete commands
+set incsearch		" do incremental searching
+
+" For Win32 GUI: remove 't' flag from 'guioptions': no tearoff menu entries
+" let &guioptions = substitute(&guioptions, "t", "", "g")
+
+" Don't use Ex mode, use Q for formatting
+map Q gq
+
+" In an xterm the mouse should work quite well, thus enable it.
+" set mouse=a
+
+" This is an alternative that also works in block mode, but the deleted
+" text is lost and it only works for putting the current register.
+"vnoremap p "_dp
+
+" Switch syntax highlighting on, when the terminal has colors
+" Also switch on highlighting the last used search pattern.
+if &t_Co > 2 || has("gui_running")
+  syntax on
+  set hlsearch
+endif
+
+" Only do this part when compiled with support for autocommands.
+if has("autocmd")
+
+  " Enable file type detection.
+  " Use the default filetype settings, so that mail gets 'tw' set to 72,
+  " 'cindent' is on in C files, etc.
+  " Also load indent files, to automatically do language-dependent indenting.
+  filetype plugin indent on
+
+  " Put these in an autocmd group, so that we can delete them easily.
+  augroup vimrcEx
+  au!
+
+  " For all text files set 'textwidth' to 78 characters.
+  autocmd FileType text setlocal textwidth=78
+
+  " When editing a file, always jump to the last known cursor position.
+  " Don't do it when the position is invalid or when inside an event handler
+  " (happens when dropping a file on gvim).
+  autocmd BufReadPost *
+    \ if line("'\"") > 0 && line("'\"") <= line("$") |
+    \   exe "normal g`\"" |
+    \ endif
+
+  augroup END
+
+else
+
+  set autoindent		" always set autoindenting on
+
+endif " has("autocmd")
+
+" Convenient command to see the difference between the current buffer and the
+"file it was loaded from, thus the changes you made.
+"command DiffOrig vert new | set bt=nofile | r # | 0d_ | diffthis
+	 	"\ | wincmd p | difftsis
+
+"#############################################################################
+"#############################################################################
+"#############################################################################
+"#############################################################################
+"modified by yuanguo 
+
+"=================begin: general vim settings=================================
+set textwidth=80
+
+"disable the annoying beep sound
+set vb
+
+"on linux, if you press 'n' (next line) when vim has already reached the end of
+"the file, the screen splashes, that is quite annoying; disable it:
+"not needed on mac
+"set t_vb=""
+
+"yuanguo: This variable controls whether a window has a status line. 
+"  0: A window never has a status line;
+"  1: If there are more than one windows, each has a status line; 
+"  2: A window always has a status line; 
+set laststatus=2
+
+"automatically read the changes made from the outside.
+set autoread
+
+"set mapleader
+let mapleader = ","
+
+"when move cursor virtically, screen will scroll if there are 7 lines at the
+"bottom/up of the screen.
+set so=7
+
+"show line number; to hide the line number, use command 
+"  :set nonu
+set nu
+
+"let the directory where session file resides become current directory of vim, 
+"when loading the seesion file.
+set sessionoptions-=curdir
+set sessionoptions+=sesdir
+"=================end: general vim settings===================================
+
+
+"=================begin: make modification to .vimrc easy=====================
+"open a file named fname in a new tab if it is not opened. If it is already
+"opened but not the current tab (not disaplayed), then change it to the
+"current tab.
+function! SwitchToBuf(fname)
+	let bwnr=bufwinnr(a:fname)
+	if bwnr!=-1
+		exe bwnr."wincmd w"
+		return 
+	else
+		tabfirst
+		let tab=1
+		while tab<=tabpagenr("$")
+			let bwnr=bufwinnr(a:fname)
+			if bwnr!=-1
+				exe "normal".tab."gt"
+				exe bwnr."wincmd w"
+				return
+			endif
+			tabnext
+			let tab=tab+1
+		endwhile
+		exe "tabnew".a:fname
+	endif
+endfunction
+
+map <silent> <leader>ss :source ~/.vimrc<cr>
+map <silent> <leader>ee :call SwitchToBuf("~/.vimrc")<cr>
+"execute source ~/.vimrc whenever it is re-written.
+autocmd! bufwritepost .vimrc source ~/.vimrc
+"=================end: make modification to .vimrc easy=======================
+
+
+"=================begin: session and viminfo==================================
+"save and load session
+map <silent> <leader>mks :mksession! .working.session<cr>
+map <silent> <leader>ls :source .working.session<cr>
+
+"save and load viminfo
+map <silent> <leader>mki :wviminfo! .working.viminfo<cr>
+map <silent> <leader>li :rviminfo .working.viminfo<cr>
+"=================end: session and viminfo====================================
+
+
+"=================begin: buffer settings======================================
+"A buffer in buffer-list can be in one of the following three stats:
+" 1. active: the file is loaded into memory and displayed in a window; the
+"            buffer may have been modified and thus be different from the file;
+" 2. hidden: the file is loaded into memory but not displayed in a window; like
+"            in activethe state, buffer may have been modified and thus be 
+"            different from the file;
+" 3. inactive: the buffer is not loaded into memory, nor displayed. The buffer
+"            in buffer-list but doesn't contain anything.
+
+"unload a buffer: free the memory allocated for the buffer. If the buffer is
+"modified, unload will fail unless "!" is added to discard the modifications;
+"unloaded buffer is still in the buffer-list but in "inactive" state;
+
+"abandon a buffer: not display it anymore. for example, 1. quit from vim; 2.
+"display another buffer by vim command "{buffer-number}b" or "e {file-name}".
+
+"hidden is a global option for buffers. bufhidden is an option specific to a
+"buffer. These 2 options affects the abandon operation:
+
+"when abandon a buffer:
+" 1. if bufhidden is empty:
+"      a. if hidden is on: the buffer becomes hidden no matter if it is
+"         modified;
+"      b. if hidden is off: the buffer is unloaded (fail if modified);
+" 2. if bufhidden is "hide": the buffer becomes hidden no matter if it is 
+"    modified;
+" 3. if bufhidden is "unload": the buffer is unloaded (fail if modified);
+" 4. if bufhidden is "delete": the buffer is unloaded (fail if modified) and
+"    then deleted from buffer-list; when deleted from buffer-list, it goes into
+"    unlisted-buffer-list.
+" 5. if bufhidden is "wipe": the buffer is unloaded (fail if modified), deleted
+"    from buffer-list, and then deleted from unlisted-buffer-list;
+
+" vim command "ls" displays only buffer-list, while "ls!" displays both
+" buffer-list and unlisted-buffer-list;
+
+"set hidden
+"=================end: buffer settings========================================
+
+
+"=================begin: tag settings=========================================
+if filereadable("tags")
+	set tags=tags
+else
+	if filereadable(".tags")
+		set tags=.tags
+	endif
+endif
+"=================end: tag settings===========================================
+
+
+"=================begin: taglist settings=====================================
+"use the exuberant ctags I installed, instead of the ctags of mac os;
+"For Linux, not needed.
+let Tlist_Ctags_Cmd='/usr/local/exuberant-ctags/bin/ctags'
+
+"Show current file's tags only.
+let Tlist_Show_One_File = 1
+
+"if only tag-window is left, then close vi
+let Tlist_Exit_OnlyWindow = 1
+
+"the tag-window is shown at the right side of the screen
+let Tlist_Use_Right_Window = 1
+
+"Auto open taglist when start vi
+let Tlist_Auto_Open = 0
+
+"Use F9 to open/close the tag-window
+map <silent> <F9> :TlistToggle<cr>
+
+"When open tag-window by Toggle, let tag-window gain the focus
+let Tlist_GainFocus_On_ToggleOpen = 1
+"=================end: taglist settings=======================================
+
+
+"=================begin: File Explorer(netrw) settings========================
+"Open file explorer
+nmap <silent> <leader>ex :Explore<cr>
+"
+let g:netrw_winsize = 30
+nmap <silent> <leader>fe :Vexplore!<cr>
+
+"listing stype, 0: thin listing (one file per line)
+"		1: long listing (one file per line, with time stamp, size info
+"		2: wide listing (multiple files in columns)
+"		3: tree style
+let g:netrw_liststyle = 3
+
+let g:netrw_list_hide = '.*\.swp$'
+"=================end: File Explorer(netrw) settings==========================
+
+
+"=================begin: BufExplorer settings=================================
+let g:bufExplorerSortBy='name'       " Sort by the buffer's name.
+"let g:bufExplorerSortBy='extension'  " Sort by file extension.
+"let g:bufExplorerSortBy='fullpath'   " Sort by full file path name.
+"let g:bufExplorerSortBy='mru'        " Sort by most recently used.
+"let g:bufExplorerSortBy='number'     " Sort by the buffer's number.
+"=================end: BufExplorer settings===================================
+
+
+"=================begin: WinManager settings==================================
+"the layout of windows
+let g:winManagerWindowLayout = "BufExplorer|TagList"
+
+"the width of explorer areas 
+let g:winManagerWidth = 50
+
+"I like the netrw, and I don't use the file explorer of WinManager. So the
+"FlieExplorer is removed from g:winManagerWindowLayout and the following
+"setting is removed.
+"let g:defaultExplorer = 0
+
+"if the explorer windows persist even if they are the only windows left
+"visible. 1: yes; 0: no.
+let g:persistentBehaviour = 0
+
+nmap <C-W><C-F> :FirstExplorerWindow<cr>
+nmap <C-W><C-B> :BottomExplorerWindow<cr>
+nmap <silent> <leader>wm :WMToggle<cr>
+"=================end: WinManager settings====================================
+
+
+"=================begin: lookup settings======================================
+"=================begin: lookup settings======================================
+"g:LookupFile_TagExpr specifies the ctag file used for lookup plugin. If it's
+"not set, the default file named 'tags' is used. Since the file 'tags' is huge, 
+"the lookup is slow.
+"Thus, we use a file named 'filenametags' or '.filenametags' as the ctags file 
+"for lookup. This ctags file contains file names only. It is not generated by 
+"ctags command but by script 'rebuild_workspace.sh', which just enumerates all
+"the files and writes to file 'filenametags' or '.filenametags';
+if filereadable("./filenametags")
+	let g:LookupFile_TagExpr = '"./filenametags"'
+else
+	if filereadable("./.filenametags")
+		let g:LookupFile_TagExpr = '"./.filenametags"'
+	endif
+endif
+
+"Do not begin to search until enter 3 characters.
+let g:LookupFile_MinPatLength = 3
+
+"Do not preserve the last search pattern.
+let g:LookupFile_PreserveLastPattern = 0
+
+"Preserve the search history
+let g:LookupFile_PreservePatternHistory = 1
+
+"when press <CR> (Carriage-Return), the first file is opened.
+let g:LookupFile_AlwaysAcceptFirst = 1
+
+"when entering non-existent files, generate an error or create a new 
+"buffer. 0 for generating error. 
+let g:LookupFile_AllowNewFiles = 0
+
+"Don't display binary files, svn files ...
+let g:LookupFile_FileFilter = '\.class$\|\.out$\|\.svn\|\.o$\|\.obj$\|\.exe$\|\.jar$\|\.zip$\|\.war$\|\.ear$'
+
+"map for lookup file, buffer or directory.
+nmap <silent> <leader>lf :LookupFile<cr>
+nmap <silent> <leader>lb :LUBufs<cr>
+nmap <silent> <leader>lw :LUWalk<cr>
+"=================end: lookup settings========================================
+
+
+"=================begin: mark settings========================================
+nmap <silent> <leader>hl <Plug>MarkSet
+vmap <silent> <leader>hl <Plug>MarkSet
+nmap <silent> <leader>hh <Plug>MarkClear
+vmap <silent> <leader>hh <Plug>MarkClear
+nmap <silent> <leader>hr <Plug>MarkRegex
+vmap <silent> <leader>hr <Plug>MarkRegex
+"=================end: mark settings==========================================
+
+
+"=================begin: cscope settings======================================
+"set csprg=/usr/local/cscope/bin/cscope
+"cs add '.cscope.out'
+"the above 2 settings are configured in ~/.vim/plugin/cscope_maps.vim, so they
+"are commented out here;
+"=================end: cscope settings========================================
+
+
+"=================begin: quickfix settings====================================
+"to next error/warning/grep-result
+nmap <leader>cn :cn<cr>
+
+"to previous error/warning/grep-result
+nmap <leader>cp :cp<cr>
+
+"open a new window for errors/warnings or grep-results.
+nmap <leader>cw :cw<cr>
+
+"close the errors/warnings or grep-results wind
+nmap <leader>ccl :ccl<cr>
+"=================end: quickfix settings======================================
+
+
+"=================begin: omnicomplete settings================================
+"normally, we use the 3 functions of omnicompletion:
+"    1. obj.            class fields 
+"    2. pobj->          class fields
+"    3. C-O (CTRL-O)    name of C/C++ variables, functions, classes and 
+"                       etc. it's better to use C-] of autocompletion;
+
+"not show the preview window when complete, just show the compleing menu.
+set completeopt=longest,menu
+
+"we don't need to configure the following three:
+"C-N(CTRL-N): if the menu's present, 'next menu item'; else it's j (next line)
+"C-P(CTRL-P): if the menu's present, 'prev menu item'; else it's k (prev line)
+"C-E(CTRL-E): if the menu's present, close the menu; else scroll screen down
+
+"if the menu is present, CR(Carriage-Return) is mapped to <C-Y>, that is to 
+"accept the current item; else it is what it is (j, the next line)
+inoremap <expr> <CR> pumvisible()?"\<C-Y>":"\<CR>"
+
+"if the menu is not present, C-O(CTRL-O) is <C-X><C-O>, that is to open the
+"omnicompletion; else, the menu is present, it's the same as C-N(next item)
+inoremap <C-O> <C-X><C-O>
+
+"if the menu is present, C-J (CTRL-J) is mapped to paging down the menu, else 
+"it is what it is.
+inoremap <expr> <C-J> pumvisible()?"\<PageDown>\<C-N>\<C-P>":"\<C-J>"
+
+"if the menu is present, C-K (CTRL-K) is mapped to paging up the menu, else it
+"is what it is.
+inoremap <expr> <C-K> pumvisible()?"\<PageUp>\<C-P>\<C-N>":"\<C-K>"
+"=================end: omnicomplete settings==================================
+
+
+"=================begin: autocomplete settings================================
+"normally, we use the 5 functions of autocompletion:
+"    1. C-](CTRL-]): similar to 'C-O' of omnicompletion, but it uses all tags 
+"                    to complete
+"    2. C-L(CTRL-L): entire line completion;
+"    3. C-D(CTRL-D): dictionary completion;
+"    4. C-B(CTRL-B): completion with words in current buffer;
+"    5. C-F(CTRL-F): completion with words in current file;
+
+set dictionary=/usr/share/dict/words
+
+"tag complete. if the menu is not present, C-] is <C-X><C-]>, else it 
+"is 'next'
+inoremap <C-]> <C-X><C-]>
+
+"entire line complete. if the menu is not present, C-L is <C-X><C-L>, else 
+"it is 'previous' (I don't know why it is no 'next')
+inoremap <C-L> <C-X><C-L>
+
+"Others don't need map, they can be used by default:
+"   <C-X><C-K>  dictionary complete 
+"   <C-X><C-N>  completing with words in current file
+"   <C-N>       completing with words in current buffer 
+"   <C-X><C-P>  like <C-X><C-N>, but the words order are different 
+"   <C-P>       like <C-N>, but the words order are different 
+"however: to make it take less key presses and/or to make it easier to 
+"remember, we remap some of them:
+"remap <C-X><C-K> (dictionary complete) to <C-D>;     'D' means dictionary;
+inoremap <C-D> <C-X><C-K>
+"remap <C-N> (words in current buffer) to <C-B>;      'B' means buffer;
+inoremap <C-B> <C-N>
+"remap <C-X><C-N> (words in current file) to <C-F>;   'F' means file;
+inoremap <C-F> <C-X><C-N>
+"=================end: autocomplete settings==================================
