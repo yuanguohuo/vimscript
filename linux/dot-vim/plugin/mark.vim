@@ -1,7 +1,7 @@
 " Script Name: mark.vim
-" Version:     1.1.8 (global version)
-" Last Change: April 25, 2008
-" Author:      Yuheng Xie <elephant@linux.net.cn>
+" Version:     1.1.12 (global version)
+" Last Change: November 21, 2017
+" Author:      Yuheng Xie <thinelephant@gmail.com>
 " Contributor: Luc Hermitte
 "
 " Description: a little script to highlight several words in different colors
@@ -38,6 +38,19 @@
 " Bugs:        some colored words could not be highlighted
 "
 " Changes:
+" 21th Nov 2017, Yuheng Xie: fix error when no marks found
+" (*) added exists() check when no marks found
+" (*) changed default mark colors again
+"
+" 17th Dec 2016, Yuheng Xie: fix error in vim 6.4
+" (*) added exists() check before calling vim 7 functions
+" (*) changed default mark colors
+"
+" 16th Jan 2015, Yuheng Xie: add auto event WinEnter
+" (*) added auto event WinEnter for reloading highlights after :split, etc.
+"
+" 29th Jul 2014, Yuheng Xie: call matchadd()
+" (*) added call to VIM 7.1 matchadd(), make highlighting keywords possible
 "
 " 10th Mar 2006, Yuheng Xie: jump to ANY mark
 " (*) added \* \# \/ \? for the ability of jumping to ANY mark, even when the
@@ -65,22 +78,34 @@
 " (*) command :Mark
 "     -> e.g. :Mark Mark.\{-}\ze(
 
+function! s:RGB(r, g, b)
+	return a:r * 36 + a:g * 6 + a:b + 16
+endfunction
+
 " default colors/groups
 " you may define your own colors in you vimrc file, in the form as below:
-hi MarkWord1  ctermbg=Cyan     ctermfg=Black  guibg=#8CCBEA    guifg=Black
-hi MarkWord2  ctermbg=Green    ctermfg=Black  guibg=#A4E57E    guifg=Black
-"yuanguo: search-hight uses Yellow, so we don't use it, use DarkYellow instead;
-"hi MarkWord3  ctermbg=Yellow   ctermfg=Black  guibg=#FFDB72    guifg=Black
-hi MarkWord3  ctermbg=DarkYellow   ctermfg=Black  guibg=#FFDB72    guifg=Black
-hi MarkWord4  ctermbg=Red      ctermfg=Black  guibg=#FF7272    guifg=Black
-hi MarkWord5  ctermbg=Magenta  ctermfg=Black  guibg=#FFB3FF    guifg=Black
-hi MarkWord6  ctermbg=Blue     ctermfg=Black  guibg=#9999FF    guifg=Black
+if &t_Co < 256
+	hi MarkWord1 guifg=White ctermfg=White guibg=#FF0000 ctermbg=Red
+	hi MarkWord2 guifg=Black ctermfg=Black guibg=#FFD700 ctermbg=Yellow
+	hi MarkWord3 guifg=Black ctermfg=Black guibg=#5FD700 ctermbg=Green
+	hi MarkWord4 guifg=Black ctermfg=Black guibg=#00D7FF ctermbg=Cyan
+	hi MarkWord5 guifg=White ctermfg=White guibg=#0087FF ctermbg=Blue
+	hi MarkWord6 guifg=White ctermfg=White guibg=#AF00FF ctermbg=Magenta
+else
+	exec "hi MarkWord1 guifg=White ctermfg=White guibg=#FF0000 ctermbg=".s:RGB(5,0,0)
+	exec "hi MarkWord2 guifg=Black ctermfg=Black guibg=#FFD700 ctermbg=".s:RGB(5,4,0)
+	exec "hi MarkWord3 guifg=Black ctermfg=Black guibg=#5FD700 ctermbg=".s:RGB(1,4,0)
+	exec "hi MarkWord4 guifg=Black ctermfg=Black guibg=#00D7FF ctermbg=".s:RGB(0,4,5)
+	exec "hi MarkWord5 guifg=White ctermfg=White guibg=#0087FF ctermbg=".s:RGB(0,2,5)
+	exec "hi MarkWord6 guifg=White ctermfg=White guibg=#AF00FF ctermbg=".s:RGB(3,0,5)
 
-"added by yuanguo
-hi MarkWord7  ctermbg=DarkRed      ctermfg=Black  guibg=#FF7272    guifg=Black
-hi MarkWord8  ctermbg=Grey     ctermfg=Black  guibg=#8CCBEA    guifg=Black
-hi MarkWord9  ctermbg=DarkGrey     ctermfg=Black  guibg=#8CCBEA    guifg=Black
-hi MarkWord10  ctermbg=White      ctermfg=Black  guibg=#FF7272    guifg=Black
+	"Yuanguo, I use 256 colors (see t_Co setting in .vimrc), and add more colors here.
+	exec "hi MarkWord7 guifg=White ctermfg=White guibg=#AF00FF ctermbg=".s:RGB(3,1,1)
+	exec "hi MarkWord8 guifg=White ctermfg=White guibg=#AF00FF ctermbg=".s:RGB(1,3,1)
+	exec "hi MarkWord9 guifg=White ctermfg=White guibg=#AF00FF ctermbg=".s:RGB(1,1,3)
+	exec "hi MarkWord10 guifg=White ctermfg=White guibg=#AF00FF ctermbg=".s:RGB(1,1,1)
+	exec "hi MarkWord11 guifg=White ctermfg=Black guibg=#AF00FF ctermbg=".s:RGB(5,5,5)
+endif
 
 " Anti reinclusion guards
 if exists('g:loaded_mark') && !exists('g:force_reload_mark')
@@ -150,7 +175,7 @@ nnoremap <silent> # :if !<sid>SearchNext("b")<bar>execute "norm! #"<bar>endif<cr
 
 command! -nargs=? Mark call s:DoMark(<f-args>)
 
-autocmd! BufWinEnter * call s:UpdateMark()
+autocmd! BufWinEnter,WinEnter * call s:UpdateMark()
 
 " Functions
 
@@ -259,8 +284,18 @@ function! s:DoMark(...) " DoMark(regexp)
 			if g:mwWord{i} != ""
 				let g:mwWord{i} = ""
 				let lastwinnr = winnr()
-				exe "windo syntax clear MarkWord" . i
+				if exists("*winsaveview")
+					let winview = winsaveview()
+				endif
+				if exists("*matchdelete")
+					windo silent! call matchdelete(3333 + i)
+				else
+					exe "windo syntax clear MarkWord" . i
+				endif
 				exe lastwinnr . "wincmd w"
+				if exists("*winrestview")
+					call winrestview(winview)
+				endif
 			endif
 			let i = i + 1
 		endwhile
@@ -277,8 +312,18 @@ function! s:DoMark(...) " DoMark(regexp)
 			endif
 			let g:mwWord{i} = ""
 			let lastwinnr = winnr()
-			exe "windo syntax clear MarkWord" . i
+			if exists("*winsaveview")
+				let winview = winsaveview()
+			endif
+			if exists("*matchdelete")
+				windo silent! call matchdelete(3333 + i)
+			else
+				exe "windo syntax clear MarkWord" . i
+			endif
 			exe lastwinnr . "wincmd w"
+			if exists("*winrestview")
+				call winrestview(winview)
+			endif
 			return 0
 		endif
 		let i = i + 1
@@ -317,11 +362,21 @@ function! s:DoMark(...) " DoMark(regexp)
 				let g:mwCycle = 1
 			endif
 			let lastwinnr = winnr()
-			exe "windo syntax clear MarkWord" . i
-			" suggested by Marc Weber
-			" exe "windo syntax match MarkWord" . i . " " . quoted_regexp . " containedin=ALL"
-			exe "windo syntax match MarkWord" . i . " " . quoted_regexp . " containedin=.*"
+			if exists("*winsaveview")
+				let winview = winsaveview()
+			endif
+			if exists("*matchadd")
+				windo silent! call matchdelete(3333 + i)
+				windo silent! call matchadd("MarkWord" . i, g:mwWord{i}, -10, 3333 + i)
+			else
+				exe "windo syntax clear MarkWord" . i
+				" suggested by Marc Weber, use .* instead off ALL
+				exe "windo syntax match MarkWord" . i . " " . quoted_regexp . " containedin=.*"
+			endif
 			exe lastwinnr . "wincmd w"
+			if exists("*winrestview")
+				call winrestview(winview)
+			endif
 			return i
 		endif
 		let i = i + 1
@@ -341,11 +396,21 @@ function! s:DoMark(...) " DoMark(regexp)
 				let g:mwCycle = 1
 			endif
 			let lastwinnr = winnr()
-			exe "windo syntax clear MarkWord" . i
-			" suggested by Marc Weber
-			" exe "windo syntax match MarkWord" . i . " " . quoted_regexp . " containedin=ALL"
-			exe "windo syntax match MarkWord" . i . " " . quoted_regexp . " containedin=.*"
+			if exists("*winsaveview")
+				let winview = winsaveview()
+			endif
+			if exists("*matchadd")
+				windo silent! call matchdelete(3333 + i)
+				windo silent! call matchadd("MarkWord" . i, g:mwWord{i}, -10, 3333 + i)
+			else
+				exe "windo syntax clear MarkWord" . i
+				" suggested by Marc Weber, use .* instead off ALL
+				exe "windo syntax match MarkWord" . i . " " . quoted_regexp . " containedin=.*"
+			endif
 			exe lastwinnr . "wincmd w"
+			if exists("*winrestview")
+				call winrestview(winview)
+			endif
 			return i
 		endif
 		let i = i + 1
@@ -375,9 +440,12 @@ function! s:UpdateMark()
 				continue
 			endif
 
-			" suggested by Marc Weber
-			" exe "syntax match MarkWord" . i . " " . quoted_regexp . " containedin=ALL"
-			exe "syntax match MarkWord" . i . " " . quoted_regexp . " containedin=.*"
+			if exists("*matchadd")
+				silent! call matchadd("MarkWord" . i, g:mwWord{i}, -10, 3333 + i)
+			else
+				" suggested by Marc Weber, use .* instead off ALL
+				exe "syntax match MarkWord" . i . " " . quoted_regexp . " containedin=.*"
+			endif
 		endif
 		let i = i + 1
 	endwhile
@@ -419,7 +487,7 @@ function! s:SearchCurrentMark(...) " SearchCurrentMark(flags)
 		let p = s:current_mark_position
 		call search(w, flags)
 		call s:CurrentMark()
-		if p == s:current_mark_position
+		if exists("s:current_mark_position") && p == s:current_mark_position
 			call search(w, flags)
 		endif
 		let g:mwLastSearched = w
@@ -468,7 +536,7 @@ function! s:SearchAnyMark(...) " SearchAnyMark(flags)
 	let w = s:AnyMark()
 	call search(w, flags)
 	call s:CurrentMark()
-	if p == s:current_mark_position
+	if exists("s:current_mark_position") && p == s:current_mark_position
 		call search(w, flags)
 	endif
 	let g:mwLastSearched = ""
