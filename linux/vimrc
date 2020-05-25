@@ -49,6 +49,7 @@ map Q gq
 "modified by yuanguo 
 set t_Co=256
 
+set encoding=utf-8
 
 " Switch syntax highlighting on, when the terminal has colors
 " Also switch on highlighting the last used search pattern.
